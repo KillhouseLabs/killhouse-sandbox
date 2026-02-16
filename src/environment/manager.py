@@ -111,6 +111,17 @@ class EnvironmentManager:
                 detector = StackDetector(repo_path)
                 stack = detector.detect()
             else:
+                # Try to extract EXPOSE port from Dockerfile
+                exposed_port = 8080
+                if dockerfile_content:
+                    for line in dockerfile_content.splitlines():
+                        stripped = line.strip().upper()
+                        if stripped.startswith("EXPOSE"):
+                            parts = stripped.split()
+                            if len(parts) >= 2 and parts[1].split("/")[0].isdigit():
+                                exposed_port = int(parts[1].split("/")[0])
+                                break
+
                 stack = DetectedStack(
                     language="unknown",
                     framework=None,
@@ -120,7 +131,7 @@ class EnvironmentManager:
                     has_docker_compose=compose_content is not None,
                     dependencies={},
                     services=[],
-                    port=8080,
+                    port=exposed_port,
                 )
 
             # Override dockerfile flag if content was provided
@@ -379,13 +390,14 @@ class EnvironmentManager:
             port=port,
         )
 
+        # Start on default bridge network for host port binding,
+        # then connect to isolated network for service communication
         container = self.docker.containers.run(
             image=image_tag,
             name=container_name,
             detach=True,
-            network=network_name,
             environment=environment,
-            ports={f"{port}/tcp": None},  # Random host port
+            ports={f"{port}/tcp": None},  # Random host port on bridge
             labels={
                 "killhouse.env_id": env_id,
                 "killhouse.target": "true",
@@ -393,9 +405,23 @@ class EnvironmentManager:
             },
         )
 
-        # Get assigned port
-        container.reload()
-        host_port = container.ports[f"{port}/tcp"][0]["HostPort"]
+        # Connect to isolated network for internal service communication
+        network = self.docker.networks.get(network_name)
+        network.connect(container)
+
+        # Get assigned port with retry
+        host_port = None
+        for _ in range(10):
+            container.reload()
+            port_bindings = container.ports.get(f"{port}/tcp")
+            if port_bindings:
+                host_port = port_bindings[0]["HostPort"]
+                break
+            await asyncio.sleep(0.5)
+
+        if not host_port:
+            raise RuntimeError(f"Container started but port {port}/tcp binding not found")
+
         target_url = f"http://{settings.host_ip}:{host_port}"
 
         logger.info(
