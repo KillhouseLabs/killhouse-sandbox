@@ -1,7 +1,9 @@
 """Common service containers (databases, caches, etc.)."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+
 import docker
 import structlog
 
@@ -14,13 +16,13 @@ class ServiceConfig:
 
     image: str
     port: int
-    environment: Dict[str, str]
-    healthcheck_cmd: Optional[str] = None
-    volumes: Optional[Dict[str, str]] = None
+    environment: dict[str, str]
+    healthcheck_cmd: str | None = None
+    volumes: dict[str, str] | None = None
 
 
 # Common service configurations
-SERVICES: Dict[str, ServiceConfig] = {
+SERVICES: dict[str, ServiceConfig] = {
     "postgres": ServiceConfig(
         image="postgres:15-alpine",
         port=5432,
@@ -86,7 +88,7 @@ class ServiceManager:
         service_name: str,
         env_id: str,
         network_name: str,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Start a service container and return connection info."""
         if service_name not in SERVICES:
             raise ValueError(f"Unknown service: {service_name}")
@@ -149,9 +151,7 @@ class ServiceManager:
     def stop_all_services(self, env_id: str) -> int:
         """Stop all services for an environment."""
         stopped = 0
-        containers = self.client.containers.list(
-            filters={"label": f"killhouse.env_id={env_id}"}
-        )
+        containers = self.client.containers.list(filters={"label": f"killhouse.env_id={env_id}"})
 
         for container in containers:
             if container.labels.get("killhouse.service"):
@@ -166,7 +166,7 @@ class ServiceManager:
         self,
         container: docker.models.containers.Container,
         config: ServiceConfig,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Get connection info for a service container."""
         container.reload()
 
@@ -180,7 +180,7 @@ class ServiceManager:
             "container_id": container.id[:12],
         }
 
-    def detect_required_services(self, dependencies: Dict[str, str]) -> List[str]:
+    def detect_required_services(self, dependencies: dict[str, str]) -> list[str]:
         """Detect required services from project dependencies."""
         services = []
 
@@ -199,20 +199,21 @@ class ServiceManager:
             services.append("elasticsearch")
 
         # Node.js packages
-        if any(pkg in dependencies for pkg in ["pg", "postgres", "sequelize", "prisma"]):
-            if "postgres" not in services:
-                services.append("postgres")
-        if any(pkg in dependencies for pkg in ["mysql", "mysql2"]):
-            if "mysql" not in services:
-                services.append("mysql")
-        if any(pkg in dependencies for pkg in ["redis", "ioredis"]):
-            if "redis" not in services:
-                services.append("redis")
-        if any(pkg in dependencies for pkg in ["mongoose", "mongodb"]):
-            if "mongodb" not in services:
-                services.append("mongodb")
-        if any(pkg in dependencies for pkg in ["amqplib"]):
-            if "rabbitmq" not in services:
-                services.append("rabbitmq")
+        if (
+            any(pkg in dependencies for pkg in ["pg", "postgres", "sequelize", "prisma"])
+            and "postgres" not in services
+        ):
+            services.append("postgres")
+        if any(pkg in dependencies for pkg in ["mysql", "mysql2"]) and "mysql" not in services:
+            services.append("mysql")
+        if any(pkg in dependencies for pkg in ["redis", "ioredis"]) and "redis" not in services:
+            services.append("redis")
+        if (
+            any(pkg in dependencies for pkg in ["mongoose", "mongodb"])
+            and "mongodb" not in services
+        ):
+            services.append("mongodb")
+        if any(pkg in dependencies for pkg in ["amqplib"]) and "rabbitmq" not in services:
+            services.append("rabbitmq")
 
         return services

@@ -2,17 +2,22 @@
 
 from datetime import datetime
 from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class CreateEnvironmentRequest(BaseModel):
     """Request to create a new target environment."""
 
-    repo_url: str = Field(..., description="Git repository URL")
+    repo_url: Optional[str] = Field(None, description="Git repository URL")
     branch: str = Field(default="main", description="Branch to checkout")
     commit: Optional[str] = Field(None, description="Specific commit hash")
     env_vars: Optional[Dict[str, str]] = Field(
         default=None, description="Additional environment variables"
+    )
+    dockerfile_content: Optional[str] = Field(None, description="Custom Dockerfile content")
+    compose_content: Optional[str] = Field(
+        None, description="docker-compose.yml content for service configuration"
     )
 
 
@@ -43,9 +48,7 @@ class EnvironmentResponse(BaseModel):
     env_id: str = Field(..., description="Environment identifier")
     target_url: str = Field(..., description="URL to access the target application")
     stack: DetectedStack = Field(..., description="Detected technology stack")
-    services: Dict[str, str] = Field(
-        ..., description="Service name to IP mapping"
-    )
+    services: Dict[str, str] = Field(..., description="Service name to IP mapping")
     status: str = Field(..., description="Environment status")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime = Field(..., description="Auto-expiration time")

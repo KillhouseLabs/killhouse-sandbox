@@ -1,0 +1,52 @@
+[project]
+name = "killhouse-sandbox"
+version = "0.1.0"
+description = "Target environment builder for security testing"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+bdd_features_base_dir = "tests/features/"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests (require Docker)",
+    "bdd: BDD scenario tests",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "UP006",  # use dict instead of Dict (Pydantic + 3.9 compat)
+    "UP007",  # use X | Y instead of Optional[X] (Pydantic + 3.9 compat)
+    "UP035",  # typing.Dict deprecated (Pydantic + 3.9 compat)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 40
+show_missing = true

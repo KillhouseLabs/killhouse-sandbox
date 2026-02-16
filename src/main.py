@@ -1,13 +1,13 @@
 """Killhouse Sandbox - Target Environment Builder."""
 
 from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import structlog
 
-from src.config import settings
 from src.api.routes import router
-
+from src.config import settings
 
 # Configure structured logging
 structlog.configure(

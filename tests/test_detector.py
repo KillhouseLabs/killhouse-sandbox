@@ -1,9 +1,10 @@
 """Tests for stack detection."""
 
 import json
-import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+import pytest
 
 from src.detection.detector import StackDetector
 

@@ -1,9 +1,11 @@
 """Stack detection orchestrator."""
 
+from __future__ import annotations
+
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
-import json
+
 import structlog
 
 logger = structlog.get_logger()
@@ -14,14 +16,14 @@ class DetectedStack:
     """Detected technology stack from source code."""
 
     language: str
-    framework: Optional[str] = None
-    runtime_version: Optional[str] = None
+    framework: str | None = None
+    runtime_version: str | None = None
     package_manager: str = "unknown"
-    dependencies: Dict[str, str] = field(default_factory=dict)
+    dependencies: dict[str, str] = field(default_factory=dict)
     has_dockerfile: bool = False
     has_docker_compose: bool = False
-    services: List[str] = field(default_factory=list)
-    entry_point: Optional[str] = None
+    services: list[str] = field(default_factory=list)
+    entry_point: str | None = None
     port: int = 8080
 
 
@@ -37,10 +39,9 @@ class StackDetector:
 
         # Check for existing Docker files
         has_dockerfile = (self.repo_path / "Dockerfile").exists()
-        has_docker_compose = (
-            (self.repo_path / "docker-compose.yml").exists()
-            or (self.repo_path / "docker-compose.yaml").exists()
-        )
+        has_docker_compose = (self.repo_path / "docker-compose.yml").exists() or (
+            self.repo_path / "docker-compose.yaml"
+        ).exists()
 
         # Detect by language
         if (self.repo_path / "package.json").exists():
@@ -60,7 +61,9 @@ class StackDetector:
         elif (self.repo_path / "Gemfile").exists():
             stack = self._detect_ruby()
         else:
-            raise ValueError("Unable to detect technology stack. No recognized project files found.")
+            raise ValueError(
+                "Unable to detect technology stack. No recognized project files found."
+            )
 
         stack.has_dockerfile = has_dockerfile
         stack.has_docker_compose = has_docker_compose
@@ -130,6 +133,7 @@ class StackDetector:
             # Parse version like ">=18" or "18.x"
             version_str = engines["node"]
             import re
+
             match = re.search(r"(\d+)", version_str)
             if match:
                 runtime_version = match.group(1)
@@ -165,6 +169,7 @@ class StackDetector:
                 if line and not line.startswith("#") and not line.startswith("-"):
                     # Parse package==version or package>=version
                     import re
+
                     match = re.match(r"^([a-zA-Z0-9_-]+)", line)
                     if match:
                         pkg_name = match.group(1).lower()
@@ -175,10 +180,12 @@ class StackDetector:
         if pyproject.exists():
             try:
                 import tomllib
+
                 data = tomllib.loads(pyproject.read_text())
                 project_deps = data.get("project", {}).get("dependencies", [])
                 for dep in project_deps:
                     import re
+
                     match = re.match(r"^([a-zA-Z0-9_-]+)", dep)
                     if match:
                         deps[match.group(1).lower()] = dep
@@ -298,7 +305,7 @@ class StackDetector:
             entry_point="bundle exec rails server -b 0.0.0.0" if framework == "rails" else None,
         )
 
-    def _parse_docker_compose_services(self) -> List[str]:
+    def _parse_docker_compose_services(self) -> list[str]:
         """Parse services from docker-compose.yml."""
         compose_path = self.repo_path / "docker-compose.yml"
         if not compose_path.exists():
@@ -309,6 +316,7 @@ class StackDetector:
 
         try:
             import yaml
+
             compose = yaml.safe_load(compose_path.read_text())
             return list(compose.get("services", {}).keys())
         except Exception:

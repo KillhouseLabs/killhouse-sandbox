@@ -1,20 +1,22 @@
 """Dockerfile generator based on detected stack."""
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional
+
 import structlog
 
-from src.detection.detector import DetectedStack
 from src.builder.templates import (
+    GO_DOCKERFILE,
+    JAVA_GRADLE_DOCKERFILE,
+    JAVA_MAVEN_DOCKERFILE,
+    NEXTJS_DOCKERFILE,
+    NODEJS_DOCKERFILE,
     PYTHON_DOCKERFILE,
     PYTHON_POETRY_DOCKERFILE,
-    NODEJS_DOCKERFILE,
-    NEXTJS_DOCKERFILE,
-    GO_DOCKERFILE,
-    JAVA_MAVEN_DOCKERFILE,
-    JAVA_GRADLE_DOCKERFILE,
     RUBY_DOCKERFILE,
 )
+from src.detection.detector import DetectedStack
 
 logger = structlog.get_logger()
 
@@ -47,7 +49,7 @@ class DockerfileGenerator:
         else:
             raise ValueError(f"Unsupported language: {self.stack.language}")
 
-    def write_dockerfile(self, output_path: Optional[Path] = None) -> Path:
+    def write_dockerfile(self, output_path: Path | None = None) -> Path:
         """Write Dockerfile to disk."""
         dockerfile_content = self.generate()
         target_path = output_path or (self.repo_path / "Dockerfile.killhouse")

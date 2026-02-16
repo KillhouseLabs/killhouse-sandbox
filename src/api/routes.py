@@ -1,17 +1,17 @@
 """API routes for Killhouse Sandbox."""
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import Dict
+from __future__ import annotations
+
 import structlog
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from src.api.schemas import (
     CreateEnvironmentRequest,
+    DeleteResponse,
     EnvironmentResponse,
     EnvironmentStatus,
-    DeleteResponse,
 )
 from src.environment.manager import EnvironmentManager
-
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -52,11 +52,11 @@ async def create_environment(
 
     except ValueError as e:
         logger.error("Invalid request", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     except Exception as e:
         logger.exception("Failed to create environment", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to create environment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create environment: {e}") from e
 
 
 @router.get("/environments/{env_id}", response_model=EnvironmentStatus)
@@ -86,14 +86,14 @@ async def delete_environment(env_id: str):
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
     except Exception as e:
         logger.exception("Failed to delete environment", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/environments", response_model=Dict[str, EnvironmentStatus])
+@router.get("/environments", response_model=dict[str, EnvironmentStatus])
 async def list_environments():
     """List all active environments."""
     return await env_manager.list_environments()

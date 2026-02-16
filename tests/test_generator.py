@@ -1,11 +1,10 @@
 """Tests for Dockerfile generator."""
 
-import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from src.detection.detector import DetectedStack
 from src.builder.generator import DockerfileGenerator
+from src.detection.detector import DetectedStack
 
 
 class TestDockerfileGenerator:

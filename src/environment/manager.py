@@ -1,21 +1,29 @@
 """Environment lifecycle manager."""
 
+from __future__ import annotations
+
 import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+
 import docker
 import git
 import structlog
 
-from src.config import settings
-from src.detection.detector import StackDetector, DetectedStack
+from src.api.schemas import (
+    DetectedStack as DetectedStackSchema,
+)
+from src.api.schemas import (
+    EnvironmentResponse,
+    EnvironmentStatus,
+)
 from src.builder.generator import DockerfileGenerator
+from src.config import settings
+from src.detection.detector import DetectedStack, StackDetector
 from src.environment.network import NetworkManager
 from src.environment.services import ServiceManager
-from src.api.schemas import EnvironmentResponse, EnvironmentStatus, DetectedStack as DetectedStackSchema
 
 logger = structlog.get_logger()
 
@@ -27,16 +35,16 @@ class Environment:
     env_id: str
     repo_url: str
     branch: str
-    commit: Optional[str]
+    commit: str | None
     stack: DetectedStack
     container_id: str
     network_id: str
-    services: Dict[str, str] = field(default_factory=dict)
+    services: dict[str, str] = field(default_factory=dict)
     status: str = "creating"
-    target_url: Optional[str] = None
-    error: Optional[str] = None
+    target_url: str | None = None
+    error: str | None = None
     created_at: datetime = field(default_factory=datetime.utcnow)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 class EnvironmentManager:
@@ -46,7 +54,7 @@ class EnvironmentManager:
         self.docker = docker.from_env()
         self.network_manager = NetworkManager()
         self.service_manager = ServiceManager()
-        self.environments: Dict[str, Environment] = {}
+        self.environments: dict[str, Environment] = {}
         self.repo_base = Path(settings.repo_clone_path)
         self.repo_base.mkdir(parents=True, exist_ok=True)
 
@@ -54,8 +62,8 @@ class EnvironmentManager:
         self,
         repo_url: str,
         branch: str = "main",
-        commit: Optional[str] = None,
-        env_vars: Optional[Dict[str, str]] = None,
+        commit: str | None = None,
+        env_vars: dict[str, str] | None = None,
     ) -> EnvironmentResponse:
         """Create a new target environment."""
         env_id = str(uuid.uuid4())[:8]
@@ -81,14 +89,10 @@ class EnvironmentManager:
 
             # 4. Start required services
             services_info = {}
-            required_services = self.service_manager.detect_required_services(
-                stack.dependencies
-            )
+            required_services = self.service_manager.detect_required_services(stack.dependencies)
 
             for service_name in required_services:
-                info = self.service_manager.start_service(
-                    service_name, env_id, network_name
-                )
+                info = self.service_manager.start_service(service_name, env_id, network_name)
                 services_info[service_name] = info["host"]
 
             # 5. Generate Dockerfile if needed
@@ -157,7 +161,7 @@ class EnvironmentManager:
             await self._cleanup_partial(env_id)
             raise
 
-    async def get_environment(self, env_id: str) -> Optional[EnvironmentStatus]:
+    async def get_environment(self, env_id: str) -> EnvironmentStatus | None:
         """Get environment status."""
         env = self.environments.get(env_id)
         if not env:
@@ -206,6 +210,7 @@ class EnvironmentManager:
         repo_path = self.repo_base / env_id
         if repo_path.exists():
             import shutil
+
             shutil.rmtree(repo_path)
 
         # Remove from tracking
@@ -213,7 +218,7 @@ class EnvironmentManager:
 
         logger.info("Environment deleted", env_id=env_id)
 
-    async def list_environments(self) -> Dict[str, EnvironmentStatus]:
+    async def list_environments(self) -> dict[str, EnvironmentStatus]:
         """List all active environments."""
         result = {}
         for env_id in list(self.environments.keys()):
@@ -227,7 +232,7 @@ class EnvironmentManager:
         env_id: str,
         repo_url: str,
         branch: str,
-        commit: Optional[str],
+        commit: str | None,
     ) -> Path:
         """Clone repository to local path."""
         repo_path = self.repo_base / env_id
@@ -290,8 +295,8 @@ class EnvironmentManager:
         image_tag: str,
         network_name: str,
         stack: DetectedStack,
-        services: Dict[str, str],
-        env_vars: Optional[Dict[str, str]],
+        services: dict[str, str],
+        env_vars: dict[str, str] | None,
     ) -> tuple[str, str]:
         """Start target container and return container ID and target URL."""
         container_name = f"killhouse-target-{env_id}"
@@ -359,6 +364,7 @@ class EnvironmentManager:
             repo_path = self.repo_base / env_id
             if repo_path.exists():
                 import shutil
+
                 shutil.rmtree(repo_path)
         except Exception as e:
             logger.warning("Cleanup failed", env_id=env_id, error=str(e))

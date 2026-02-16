@@ -1,6 +1,7 @@
 """Docker network management for isolated environments."""
 
-from typing import Optional
+from __future__ import annotations
+
 import docker
 import structlog
 
@@ -48,7 +49,7 @@ class NetworkManager:
             logger.error("Failed to delete network", name=network_name, error=str(e))
             raise
 
-    def get_network(self, env_id: str) -> Optional[docker.models.networks.Network]:
+    def get_network(self, env_id: str) -> docker.models.networks.Network | None:
         """Get the network for an environment."""
         network_name = f"killhouse-{env_id}"
 
@@ -82,9 +83,7 @@ class NetworkManager:
     def cleanup_orphaned_networks(self) -> int:
         """Remove networks without running containers."""
         removed = 0
-        networks = self.client.networks.list(
-            filters={"label": "killhouse.managed=true"}
-        )
+        networks = self.client.networks.list(filters={"label": "killhouse.managed=true"})
 
         for network in networks:
             if not network.containers:
