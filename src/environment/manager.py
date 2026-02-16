@@ -19,6 +19,7 @@ from src.api.schemas import (
     EnvironmentResponse,
     EnvironmentStatus,
 )
+from src.builder.compose_parser import ComposeParser
 from src.builder.generator import DockerfileGenerator
 from src.config import settings
 from src.detection.detector import DetectedStack, StackDetector
@@ -60,10 +61,12 @@ class EnvironmentManager:
 
     async def create_environment(
         self,
-        repo_url: str,
+        repo_url: str | None = None,
         branch: str = "main",
         commit: str | None = None,
         env_vars: dict[str, str] | None = None,
+        dockerfile_content: str | None = None,
+        compose_content: str | None = None,
     ) -> EnvironmentResponse:
         """Create a new target environment."""
         env_id = str(uuid.uuid4())[:8]
@@ -73,37 +76,85 @@ class EnvironmentManager:
             env_id=env_id,
             repo_url=repo_url,
             branch=branch,
+            has_dockerfile_content=dockerfile_content is not None,
+            has_compose_content=compose_content is not None,
         )
 
         try:
-            # 1. Clone repository
-            repo_path = await self._clone_repository(env_id, repo_url, branch, commit)
+            # 1. Clone repository or create workspace from uploaded content
+            if repo_url:
+                repo_path = await self._clone_repository(env_id, repo_url, branch, commit)
+            else:
+                repo_path = self.repo_base / env_id
+                repo_path.mkdir(parents=True, exist_ok=True)
 
-            # 2. Detect stack
-            detector = StackDetector(repo_path)
-            stack = detector.detect()
+            # 2. Write uploaded Dockerfile if provided
+            if dockerfile_content:
+                dockerfile_path = repo_path / "Dockerfile"
+                dockerfile_path.write_text(dockerfile_content)
 
-            # 3. Create isolated network
+            # 3. Parse compose content for dependency services
+            compose_services = []
+            if compose_content:
+                compose_path = repo_path / "docker-compose.yml"
+                compose_path.write_text(compose_content)
+                parser = ComposeParser(compose_content)
+                parsed = parser.parse()
+                compose_services = parsed.dependencies
+
+            # 4. Detect stack or build minimal stack from provided content
+            if (
+                repo_url
+                or (repo_path / "package.json").exists()
+                or (repo_path / "requirements.txt").exists()
+            ):
+                detector = StackDetector(repo_path)
+                stack = detector.detect()
+            else:
+                stack = DetectedStack(
+                    language="unknown",
+                    framework=None,
+                    runtime_version=None,
+                    package_manager="manual",
+                    has_dockerfile=dockerfile_content is not None,
+                    has_docker_compose=compose_content is not None,
+                    dependencies={},
+                    services=[],
+                    port=8080,
+                )
+
+            # Override dockerfile flag if content was provided
+            if dockerfile_content:
+                stack.has_dockerfile = True
+            if compose_content:
+                stack.has_docker_compose = True
+
+            # 5. Create isolated network
             network_id = self.network_manager.create_network(env_id)
             network_name = f"killhouse-{env_id}"
 
-            # 4. Start required services
+            # 6. Start required services (from stack detection + compose dependencies)
             services_info = {}
             required_services = self.service_manager.detect_required_services(stack.dependencies)
+
+            # Add compose dependency services (image-based)
+            for dep in compose_services:
+                if dep.image and dep.name not in required_services:
+                    required_services.append(dep.name)
 
             for service_name in required_services:
                 info = self.service_manager.start_service(service_name, env_id, network_name)
                 services_info[service_name] = info["host"]
 
-            # 5. Generate Dockerfile if needed
+            # 7. Generate Dockerfile if needed
             if not stack.has_dockerfile:
                 generator = DockerfileGenerator(repo_path, stack)
                 generator.write_dockerfile()
 
-            # 6. Build target image
+            # 8. Build target image
             image_tag = await self._build_image(env_id, repo_path, stack)
 
-            # 7. Start target container
+            # 9. Start target container
             container_id, target_url = await self._start_container(
                 env_id,
                 image_tag,
@@ -113,11 +164,11 @@ class EnvironmentManager:
                 env_vars,
             )
 
-            # 8. Store environment
+            # 10. Store environment
             expires_at = datetime.utcnow() + timedelta(hours=settings.env_ttl_hours)
             env = Environment(
                 env_id=env_id,
-                repo_url=repo_url,
+                repo_url=repo_url or "",
                 branch=branch,
                 commit=commit,
                 stack=stack,

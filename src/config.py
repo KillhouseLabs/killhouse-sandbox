@@ -31,6 +31,13 @@ class Settings(BaseSettings):
 
     # Paths
     work_dir: Path = Path("/tmp/killhouse-sandbox")
+    repo_clone_path: Path = Path("/tmp/killhouse-sandbox/repos")
+
+    # Host
+    host_ip: str = "127.0.0.1"
+
+    # TTL
+    env_ttl_hours: int = 1
 
     # Timeouts
     build_timeout_seconds: int = 300

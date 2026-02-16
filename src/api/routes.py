@@ -46,6 +46,8 @@ async def create_environment(
             branch=request.branch,
             commit=request.commit,
             env_vars=request.env_vars,
+            dockerfile_content=request.dockerfile_content,
+            compose_content=request.compose_content,
         )
 
         return result
