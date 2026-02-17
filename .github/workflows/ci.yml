@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   quality:
     name: Code Quality
@@ -44,3 +48,24 @@ jobs:
 
       - name: Run unit tests with coverage
         run: pytest -m "not integration" --cov=src --cov-report=term-missing -v
+
+  build:
+    name: Build Docker Image
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t killhouse-sandbox:ci .
+
+  deploy:
+    name: Deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    uses: KillhouseLabs/.github/.github/workflows/deploy.yml@main
+    with:
+      service_name: exploit-sandbox
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+    permissions:
+      id-token: write
+      contents: read
