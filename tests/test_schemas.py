@@ -1,6 +1,6 @@
 """Tests for API schema extensions."""
 
-from src.api.schemas import CreateEnvironmentRequest
+from src.api.schemas import CreateEnvironmentRequest, DetectedStack, EnvironmentResponse
 
 
 class TestCreateEnvironmentRequest:
@@ -44,3 +44,27 @@ class TestCreateEnvironmentRequest:
         )
         assert req.repo_url is None
         assert req.dockerfile_content is not None
+
+
+class TestEnvironmentResponse:
+    """EnvironmentResponse에 network_name 필드 추가 검증."""
+
+    def test_environment_response_includes_network_name(self):
+        from datetime import datetime, timedelta
+
+        response = EnvironmentResponse(
+            env_id="test1234",
+            target_url="http://killhouse-target-test1234:8080",
+            network_name="killhouse-test1234",
+            stack=DetectedStack(
+                language="python",
+                framework=None,
+                runtime_version=None,
+                package_manager="pip",
+            ),
+            services={},
+            status="running",
+            created_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        assert response.network_name == "killhouse-test1234"

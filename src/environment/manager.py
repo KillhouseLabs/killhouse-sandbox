@@ -203,6 +203,7 @@ class EnvironmentManager:
             return EnvironmentResponse(
                 env_id=env_id,
                 target_url=target_url,
+                network_name=network_name,
                 stack=DetectedStackSchema(
                     language=stack.language,
                     framework=stack.framework,
@@ -394,14 +395,13 @@ class EnvironmentManager:
             port=port,
         )
 
-        # Start on default bridge network for host port binding,
-        # then connect to isolated network for service communication
+        # Start directly on isolated network (no host port binding needed)
         container = self.docker.containers.run(
             image=image_tag,
             name=container_name,
             detach=True,
             environment=environment,
-            ports={f"{port}/tcp": None},  # Random host port on bridge
+            network=network_name,
             labels={
                 "killhouse.env_id": env_id,
                 "killhouse.target": "true",
@@ -409,24 +409,7 @@ class EnvironmentManager:
             },
         )
 
-        # Connect to isolated network for internal service communication
-        network = self.docker.networks.get(network_name)
-        network.connect(container)
-
-        # Get assigned port with retry
-        host_port = None
-        for _ in range(10):
-            container.reload()
-            port_bindings = container.ports.get(f"{port}/tcp")
-            if port_bindings:
-                host_port = port_bindings[0]["HostPort"]
-                break
-            await asyncio.sleep(0.5)
-
-        if not host_port:
-            raise RuntimeError(f"Container started but port {port}/tcp binding not found")
-
-        target_url = f"http://{settings.host_ip}:{host_port}"
+        target_url = f"http://{container_name}:{port}"
 
         logger.info(
             "Container started",

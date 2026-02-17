@@ -47,6 +47,7 @@ class EnvironmentResponse(BaseModel):
 
     env_id: str = Field(..., description="Environment identifier")
     target_url: str = Field(..., description="URL to access the target application")
+    network_name: str = Field(..., description="Docker network name for scanner connectivity")
     stack: DetectedStack = Field(..., description="Detected technology stack")
     services: Dict[str, str] = Field(..., description="Service name to IP mapping")
     status: str = Field(..., description="Environment status")
