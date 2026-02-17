@@ -14,6 +14,7 @@ class ComposeService:
     name: str
     image: str | None = None
     build: str | None = None
+    dockerfile: str | None = None
     ports: list[str] = field(default_factory=list)
     environment: dict[str, str] = field(default_factory=dict)
     depends_on: list[str] = field(default_factory=list)
@@ -61,6 +62,10 @@ class ComposeParser:
             else (build_val.get("context", ".") if isinstance(build_val, dict) else None)
         )
 
+        dockerfile = None
+        if isinstance(build_val, dict):
+            dockerfile = build_val.get("dockerfile")
+
         env = config.get("environment", {})
         if isinstance(env, list):
             env = dict(item.split("=", 1) for item in env if "=" in item)
@@ -73,6 +78,7 @@ class ComposeParser:
             name=name,
             image=config.get("image"),
             build=build_str,
+            dockerfile=dockerfile,
             ports=[str(p) for p in config.get("ports", [])],
             environment=env,
             depends_on=depends,

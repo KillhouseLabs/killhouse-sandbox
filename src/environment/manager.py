@@ -137,6 +137,7 @@ class EnvironmentManager:
             # Override dockerfile flag if content was provided
             if dockerfile_content:
                 stack.has_dockerfile = True
+                stack.dockerfile_path = "Dockerfile"
             if compose_content:
                 stack.has_docker_compose = True
 
@@ -334,7 +335,10 @@ class EnvironmentManager:
         logger.info("Building image", tag=image_tag)
 
         # Use generated Dockerfile or existing one
-        dockerfile = "Dockerfile.killhouse" if not stack.has_dockerfile else "Dockerfile"
+        if not stack.has_dockerfile:
+            dockerfile = "Dockerfile.killhouse"
+        else:
+            dockerfile = stack.dockerfile_path or "Dockerfile"
 
         # Build image
         loop = asyncio.get_event_loop()

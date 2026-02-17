@@ -89,3 +89,27 @@ services:
         result = ComposeParser(compose).parse()
         assert result.target_service is None
         assert len(result.dependencies) == 2
+
+    def test_parse_build_with_dockerfile_path(self):
+        compose = """
+services:
+  app:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+"""
+        result = ComposeParser(compose).parse()
+        assert result.target_service is not None
+        assert result.target_service.dockerfile == "infra/Dockerfile"
+        assert result.target_service.build == "."
+
+    def test_parse_build_string_no_dockerfile(self):
+        compose = """
+services:
+  app:
+    build: .
+"""
+        result = ComposeParser(compose).parse()
+        assert result.target_service is not None
+        assert result.target_service.dockerfile is None
+        assert result.target_service.build == "."

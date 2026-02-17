@@ -3,12 +3,26 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import structlog
 
 logger = structlog.get_logger()
+
+EXCLUDED_DIRS = frozenset({
+    ".devcontainer", "test", "tests", "example", "examples",
+    ".github", "vendor", "node_modules", ".venv",
+})
+
+PRIORITY_DIRS: dict[str, int] = {
+    ".": 0,
+    "docker": 1,
+    "infra": 1,
+    "build": 1,
+    "deploy": 1,
+}
 
 
 @dataclass
@@ -22,6 +36,7 @@ class DetectedStack:
     dependencies: dict[str, str] = field(default_factory=dict)
     has_dockerfile: bool = False
     has_docker_compose: bool = False
+    dockerfile_path: str | None = None
     services: list[str] = field(default_factory=list)
     entry_point: str | None = None
     port: int = 8080
@@ -37,8 +52,9 @@ class StackDetector:
         """Analyze repository and detect technology stack."""
         logger.info("Detecting stack", repo_path=str(self.repo_path))
 
-        # Check for existing Docker files
-        has_dockerfile = (self.repo_path / "Dockerfile").exists()
+        # Check for existing Docker files (including subdirectories)
+        dockerfile_path = self._find_dockerfile()
+        has_dockerfile = dockerfile_path is not None
         has_docker_compose = (self.repo_path / "docker-compose.yml").exists() or (
             self.repo_path / "docker-compose.yaml"
         ).exists()
@@ -66,6 +82,7 @@ class StackDetector:
             )
 
         stack.has_dockerfile = has_dockerfile
+        stack.dockerfile_path = dockerfile_path
         stack.has_docker_compose = has_docker_compose
 
         if has_docker_compose:
@@ -76,6 +93,7 @@ class StackDetector:
             language=stack.language,
             framework=stack.framework,
             runtime_version=stack.runtime_version,
+            dockerfile_path=dockerfile_path,
         )
 
         return stack
@@ -304,6 +322,102 @@ class StackDetector:
             port=port,
             entry_point="bundle exec rails server -b 0.0.0.0" if framework == "rails" else None,
         )
+
+    def _find_dockerfile(self) -> str | None:
+        """Find a service Dockerfile using structured 3-phase search."""
+        # Phase 1: Check docker-compose.yml references
+        result = self._find_dockerfile_from_compose()
+        if result:
+            return result
+
+        # Phase 2 + 3: Glob search with filtering and content validation
+        return self._find_dockerfile_by_glob()
+
+    def _find_dockerfile_from_compose(self) -> str | None:
+        """Extract Dockerfile path from docker-compose.yml build config."""
+        compose_path = self.repo_path / "docker-compose.yml"
+        if not compose_path.exists():
+            compose_path = self.repo_path / "docker-compose.yaml"
+        if not compose_path.exists():
+            return None
+
+        try:
+            import yaml
+
+            compose = yaml.safe_load(compose_path.read_text())
+            for _name, config in (compose.get("services") or {}).items():
+                if not isinstance(config, dict):
+                    continue
+                build_val = config.get("build")
+                if not isinstance(build_val, dict):
+                    continue
+                dockerfile = build_val.get("dockerfile")
+                if not dockerfile:
+                    continue
+                full_path = self.repo_path / dockerfile
+                if full_path.exists() and self._is_service_dockerfile(full_path):
+                    return dockerfile
+        except Exception:
+            pass
+        return None
+
+    def _find_dockerfile_by_glob(self) -> str | None:
+        """Find Dockerfile by recursive glob with filtering and validation."""
+        candidates: list[tuple[int, str]] = []
+
+        for path in self.repo_path.rglob("Dockerfile"):
+            relative = path.relative_to(self.repo_path)
+            parts = relative.parts
+
+            # Exclude files in blacklisted directories
+            if any(part in EXCLUDED_DIRS for part in parts[:-1]):
+                continue
+
+            if not self._is_service_dockerfile(path):
+                continue
+
+            rel_str = str(relative)
+            priority = self._dockerfile_priority(rel_str)
+            candidates.append((priority, rel_str))
+
+        if not candidates:
+            return None
+
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0][1]
+
+    @staticmethod
+    def _is_service_dockerfile(path: Path) -> bool:
+        """Verify a Dockerfile defines a runnable service (FROM + EXPOSE/CMD/ENTRYPOINT)."""
+        try:
+            content = path.read_text()
+        except OSError:
+            return False
+
+        has_from = False
+        has_runtime = False
+
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            upper = stripped.upper()
+            if upper.startswith("FROM "):
+                has_from = True
+            elif re.match(r"^(EXPOSE|CMD|ENTRYPOINT)\s", upper):
+                has_runtime = True
+
+        return has_from and has_runtime
+
+    @staticmethod
+    def _dockerfile_priority(relative_path: str) -> int:
+        """Return priority score for a Dockerfile path (lower is better)."""
+        if relative_path == "Dockerfile":
+            return 0
+
+        parts = Path(relative_path).parts
+        parent_dir = parts[0] if len(parts) > 1 else "."
+        return PRIORITY_DIRS.get(parent_dir, 2)
 
     def _parse_docker_compose_services(self) -> list[str]:
         """Parse services from docker-compose.yml."""
