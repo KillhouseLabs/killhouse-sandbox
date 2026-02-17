@@ -124,7 +124,7 @@ require github.com/gin-gonic/gin v1.9.1
             package_json = {"name": "test-app", "dependencies": {"express": "^4.0.0"}}
             (repo_path / "package.json").write_text(json.dumps(package_json))
             (repo_path / "Dockerfile").write_text(
-                "FROM node:20\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n"
+                'FROM node:20\nEXPOSE 3000\nCMD ["node", "server.js"]\n'
             )
 
             detector = StackDetector(repo_path)
@@ -154,7 +154,7 @@ require github.com/gin-gonic/gin v1.9.1
             infra = repo_path / "infra"
             infra.mkdir()
             (infra / "Dockerfile").write_text(
-                "FROM node:20\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n"
+                'FROM node:20\nEXPOSE 3000\nCMD ["node", "server.js"]\n'
             )
 
             detector = StackDetector(repo_path)
@@ -171,7 +171,7 @@ class TestDockerfileDiscovery:
         with TemporaryDirectory() as tmpdir:
             repo_path = Path(tmpdir)
             (repo_path / "Dockerfile").write_text(
-                "FROM node:20\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n"
+                'FROM node:20\nEXPOSE 3000\nCMD ["node", "server.js"]\n'
             )
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() == "Dockerfile"
@@ -192,7 +192,7 @@ class TestDockerfileDiscovery:
             infra = repo_path / "infra"
             infra.mkdir()
             (infra / "Dockerfile").write_text(
-                "FROM openjdk:17\nEXPOSE 8080\nCMD [\"java\", \"-jar\", \"app.jar\"]\n"
+                'FROM openjdk:17\nEXPOSE 8080\nCMD ["java", "-jar", "app.jar"]\n'
             )
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() == "infra/Dockerfile"
@@ -211,7 +211,7 @@ class TestDockerfileDiscovery:
             infra = repo_path / "infra"
             infra.mkdir()
             (infra / "Dockerfile").write_text(
-                "FROM openjdk:17\nEXPOSE 8080\nENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n"
+                'FROM openjdk:17\nEXPOSE 8080\nENTRYPOINT ["java", "-jar", "app.jar"]\n'
             )
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() == "infra/Dockerfile"
@@ -222,7 +222,7 @@ class TestDockerfileDiscovery:
             docker_dir = repo_path / "docker"
             docker_dir.mkdir()
             (docker_dir / "Dockerfile").write_text(
-                "FROM python:3.11\nEXPOSE 8000\nCMD [\"python\", \"app.py\"]\n"
+                'FROM python:3.11\nEXPOSE 8000\nCMD ["python", "app.py"]\n'
             )
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() == "docker/Dockerfile"
@@ -233,7 +233,7 @@ class TestDockerfileDiscovery:
             devcontainer = repo_path / ".devcontainer"
             devcontainer.mkdir()
             (devcontainer / "Dockerfile").write_text(
-                "FROM ubuntu:22.04\nRUN apt-get update\nEXPOSE 3000\nCMD [\"bash\"]\n"
+                'FROM ubuntu:22.04\nRUN apt-get update\nEXPOSE 3000\nCMD ["bash"]\n'
             )
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() is None
@@ -243,9 +243,7 @@ class TestDockerfileDiscovery:
             repo_path = Path(tmpdir)
             test_dir = repo_path / "tests"
             test_dir.mkdir()
-            (test_dir / "Dockerfile").write_text(
-                "FROM python:3.11\nEXPOSE 8000\nCMD [\"pytest\"]\n"
-            )
+            (test_dir / "Dockerfile").write_text('FROM python:3.11\nEXPOSE 8000\nCMD ["pytest"]\n')
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() is None
 
@@ -253,13 +251,11 @@ class TestDockerfileDiscovery:
         with TemporaryDirectory() as tmpdir:
             repo_path = Path(tmpdir)
             (repo_path / "Dockerfile").write_text(
-                "FROM node:20\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n"
+                'FROM node:20\nEXPOSE 3000\nCMD ["node", "server.js"]\n'
             )
             infra = repo_path / "infra"
             infra.mkdir()
-            (infra / "Dockerfile").write_text(
-                "FROM nginx:latest\nEXPOSE 80\nCMD [\"nginx\"]\n"
-            )
+            (infra / "Dockerfile").write_text('FROM nginx:latest\nEXPOSE 80\nCMD ["nginx"]\n')
             detector = StackDetector(repo_path)
             assert detector._find_dockerfile() == "Dockerfile"
 
@@ -273,13 +269,13 @@ class TestDockerfileDiscovery:
     def test_is_service_dockerfile_with_expose_and_cmd(self):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "Dockerfile"
-            p.write_text("FROM node:20\nEXPOSE 3000\nCMD [\"node\", \"app.js\"]\n")
+            p.write_text('FROM node:20\nEXPOSE 3000\nCMD ["node", "app.js"]\n')
             assert StackDetector._is_service_dockerfile(p) is True
 
     def test_is_service_dockerfile_with_entrypoint(self):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "Dockerfile"
-            p.write_text("FROM openjdk:17\nEXPOSE 8080\nENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n")
+            p.write_text('FROM openjdk:17\nEXPOSE 8080\nENTRYPOINT ["java", "-jar", "app.jar"]\n')
             assert StackDetector._is_service_dockerfile(p) is True
 
     def test_is_service_dockerfile_without_expose_or_cmd(self):
@@ -291,7 +287,7 @@ class TestDockerfileDiscovery:
     def test_is_service_dockerfile_without_from(self):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "Dockerfile"
-            p.write_text("EXPOSE 3000\nCMD [\"node\", \"app.js\"]\n")
+            p.write_text('EXPOSE 3000\nCMD ["node", "app.js"]\n')
             assert StackDetector._is_service_dockerfile(p) is False
 
     def test_dockerfile_priority_root(self):

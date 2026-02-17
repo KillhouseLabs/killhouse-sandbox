@@ -11,10 +11,19 @@ import structlog
 
 logger = structlog.get_logger()
 
-EXCLUDED_DIRS = frozenset({
-    ".devcontainer", "test", "tests", "example", "examples",
-    ".github", "vendor", "node_modules", ".venv",
-})
+EXCLUDED_DIRS = frozenset(
+    {
+        ".devcontainer",
+        "test",
+        "tests",
+        "example",
+        "examples",
+        ".github",
+        "vendor",
+        "node_modules",
+        ".venv",
+    }
+)
 
 PRIORITY_DIRS: dict[str, int] = {
     ".": 0,

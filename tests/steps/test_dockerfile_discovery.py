@@ -10,7 +10,7 @@ from src.detection.detector import StackDetector
 
 FEATURE = "../features/detection/dockerfile_discovery.feature"
 
-SERVICE_DOCKERFILE = "FROM node:20\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n"
+SERVICE_DOCKERFILE = 'FROM node:20\nEXPOSE 3000\nCMD ["node", "server.js"]\n'
 BUILDER_DOCKERFILE = "FROM ubuntu:22.04\nRUN apt-get update && apt-get install -y build-essential\n"
 COMPOSE_WITH_DOCKERFILE_REF = (
     "services:\n"
