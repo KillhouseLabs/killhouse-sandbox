@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     build_timeout_seconds: int = 300
     startup_timeout_seconds: int = 60
 
+    # Supabase
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+
     class Config:
         env_file = ".env"
         env_prefix = "SANDBOX_"

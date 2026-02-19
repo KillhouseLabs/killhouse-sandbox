@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import docker
 import structlog
 
+from src.policy import fetch_policy, get_plan_limits
+
 logger = structlog.get_logger()
 
 
@@ -88,6 +90,7 @@ class ServiceManager:
         service_name: str,
         env_id: str,
         network_name: str,
+        plan_id: str = "free",
     ) -> dict[str, str]:
         """Start a service container and return connection info."""
         if service_name not in SERVICES:
@@ -113,6 +116,10 @@ class ServiceManager:
         except docker.errors.NotFound:
             pass
 
+        # Get plan limits for resource enforcement
+        policy = fetch_policy()
+        limits = get_plan_limits(policy, plan_id)
+
         # Start container
         container = self.client.containers.run(
             image=config.image,
@@ -120,6 +127,9 @@ class ServiceManager:
             detach=True,
             environment=config.environment,
             network=network_name,
+            mem_limit=limits.container_memory_limit,
+            nano_cpus=int(limits.container_cpu_limit * 1e9),
+            pids_limit=limits.container_pids_limit,
             labels={
                 "killhouse.env_id": env_id,
                 "killhouse.service": service_name,

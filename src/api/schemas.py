@@ -19,6 +19,7 @@ class CreateEnvironmentRequest(BaseModel):
     compose_content: Optional[str] = Field(
         None, description="docker-compose.yml content for service configuration"
     )
+    plan_id: str = Field(default="free", description="Subscription plan ID for resource limits")
 
 
 class DetectedStack(BaseModel):

@@ -48,13 +48,20 @@ async def create_environment(
             env_vars=request.env_vars,
             dockerfile_content=request.dockerfile_content,
             compose_content=request.compose_content,
+            plan_id=request.plan_id,
         )
 
         return result
 
     except ValueError as e:
-        logger.error("Invalid request", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        error_msg = str(e)
+        # Check if it's a concurrency limit error
+        if "동시 샌드박스 수 제한" in error_msg:
+            logger.error("Concurrency limit reached", error=error_msg)
+            raise HTTPException(status_code=429, detail=error_msg) from e
+        else:
+            logger.error("Invalid request", error=error_msg)
+            raise HTTPException(status_code=400, detail=error_msg) from e
 
     except Exception as e:
         logger.exception("Failed to create environment", error=str(e))

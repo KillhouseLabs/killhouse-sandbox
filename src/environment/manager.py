@@ -25,6 +25,7 @@ from src.config import settings
 from src.detection.detector import DetectedStack, StackDetector
 from src.environment.network import NetworkManager
 from src.environment.services import ServiceManager
+from src.policy import fetch_policy, get_plan_limits
 
 logger = structlog.get_logger()
 
@@ -67,8 +68,19 @@ class EnvironmentManager:
         env_vars: dict[str, str] | None = None,
         dockerfile_content: str | None = None,
         compose_content: str | None = None,
+        plan_id: str = "free",
     ) -> EnvironmentResponse:
         """Create a new target environment."""
+        # Check concurrency limit
+        policy = fetch_policy()
+        limits = get_plan_limits(policy, plan_id)
+
+        active_envs = len(self.environments)
+        if active_envs >= limits.max_concurrent_sandboxes:
+            raise ValueError(
+                f"동시 샌드박스 수 제한({limits.max_concurrent_sandboxes}개)에 도달했습니다."
+            )
+
         env_id = str(uuid.uuid4())[:8]
 
         logger.info(
@@ -155,7 +167,7 @@ class EnvironmentManager:
                     required_services.append(dep.name)
 
             for service_name in required_services:
-                info = self.service_manager.start_service(service_name, env_id, network_name)
+                info = self.service_manager.start_service(service_name, env_id, network_name, plan_id)
                 services_info[service_name] = info["host"]
 
             # 7. Generate Dockerfile if needed
@@ -174,6 +186,7 @@ class EnvironmentManager:
                 stack,
                 services_info,
                 env_vars,
+                plan_id,
             )
 
             # 10. Store environment
@@ -364,6 +377,7 @@ class EnvironmentManager:
         stack: DetectedStack,
         services: dict[str, str],
         env_vars: dict[str, str] | None,
+        plan_id: str = "free",
     ) -> tuple[str, str]:
         """Start target container and return container ID and target URL."""
         container_name = f"killhouse-target-{env_id}"
@@ -388,11 +402,19 @@ class EnvironmentManager:
                 f"mongodb://killhouse:killhouse@{services['mongodb']}:27017"
             )
 
+        # Get plan limits for resource enforcement
+        policy = fetch_policy()
+        limits = get_plan_limits(policy, plan_id)
+
         logger.info(
             "Starting container",
             name=container_name,
             image=image_tag,
             port=port,
+            plan_id=plan_id,
+            mem_limit=limits.container_memory_limit,
+            cpu_limit=limits.container_cpu_limit,
+            pids_limit=limits.container_pids_limit,
         )
 
         # Start directly on isolated network (no host port binding needed)
@@ -402,6 +424,9 @@ class EnvironmentManager:
             detach=True,
             environment=environment,
             network=network_name,
+            mem_limit=limits.container_memory_limit,
+            nano_cpus=int(limits.container_cpu_limit * 1e9),
+            pids_limit=limits.container_pids_limit,
             labels={
                 "killhouse.env_id": env_id,
                 "killhouse.target": "true",
