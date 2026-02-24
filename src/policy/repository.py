@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import time
-from typing import Optional
 
 from .functions import DEFAULT_FREE_LIMITS
 from .models import PlanConfig, PlanLimits, Policy, SubscriptionStatus
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
-_cached_policy: Optional[Policy] = None
+_cached_policy: Policy | None = None
 _cache_timestamp: float = 0
 
 

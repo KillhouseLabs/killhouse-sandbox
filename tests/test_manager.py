@@ -25,7 +25,7 @@ class TestStartContainer:
         stack = MagicMock()
         stack.port = 8080
 
-        container_id, target_url = await self.manager._start_container(
+        _container_id, target_url = await self.manager._start_container(
             env_id="test1234",
             image_tag="killhouse-target:test1234",
             network_name="killhouse-test1234",

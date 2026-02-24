@@ -1,7 +1,7 @@
 """API schemas for Killhouse Sandbox."""
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -9,14 +9,14 @@ from pydantic import BaseModel, Field
 class CreateEnvironmentRequest(BaseModel):
     """Request to create a new target environment."""
 
-    repo_url: Optional[str] = Field(None, description="Git repository URL")
+    repo_url: str | None = Field(None, description="Git repository URL")
     branch: str = Field(default="main", description="Branch to checkout")
-    commit: Optional[str] = Field(None, description="Specific commit hash")
-    env_vars: Optional[Dict[str, str]] = Field(
+    commit: str | None = Field(None, description="Specific commit hash")
+    env_vars: Dict[str, str] | None = Field(
         default=None, description="Additional environment variables"
     )
-    dockerfile_content: Optional[str] = Field(None, description="Custom Dockerfile content")
-    compose_content: Optional[str] = Field(
+    dockerfile_content: str | None = Field(None, description="Custom Dockerfile content")
+    compose_content: str | None = Field(
         None, description="docker-compose.yml content for service configuration"
     )
     plan_id: str = Field(default="free", description="Subscription plan ID for resource limits")
@@ -26,8 +26,8 @@ class DetectedStack(BaseModel):
     """Detected technology stack."""
 
     language: str = Field(..., description="Primary language (javascript, python, go)")
-    framework: Optional[str] = Field(None, description="Framework (nextjs, fastapi, etc)")
-    runtime_version: Optional[str] = Field(None, description="Runtime version")
+    framework: str | None = Field(None, description="Framework (nextjs, fastapi, etc)")
+    runtime_version: str | None = Field(None, description="Runtime version")
     package_manager: str = Field(..., description="Package manager (npm, pip, etc)")
     has_dockerfile: bool = Field(default=False)
     has_docker_compose: bool = Field(default=False)
@@ -61,10 +61,10 @@ class EnvironmentStatus(BaseModel):
 
     env_id: str
     status: str  # creating, running, stopped, error
-    target_url: Optional[str] = None
+    target_url: str | None = None
     services: Dict[str, str] = Field(default_factory=dict)
-    logs: Optional[str] = None
-    error: Optional[str] = None
+    logs: str | None = None
+    error: str | None = None
     created_at: datetime
     expires_at: datetime
 
