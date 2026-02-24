@@ -167,7 +167,9 @@ class EnvironmentManager:
                     required_services.append(dep.name)
 
             for service_name in required_services:
-                info = self.service_manager.start_service(service_name, env_id, network_name, plan_id)
+                info = self.service_manager.start_service(
+                    service_name, env_id, network_name, plan_id
+                )
                 services_info[service_name] = info["host"]
 
             # 7. Generate Dockerfile if needed
